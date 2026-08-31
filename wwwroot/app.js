@@ -6,6 +6,13 @@ const api = (url, options) => fetch(url, { headers: { "Content-Type": "applicati
   return response.json();
 });
 
+const tabs = [
+  { id: "quotes", label: "Cotizaciones", icon: "C" },
+  { id: "products", label: "Productos", icon: "P" },
+  { id: "suppliers", label: "Proveedores", icon: "V" },
+  { id: "clients", label: "Clientes", icon: "L" }
+];
+
 function App() {
   const [tab, setTab] = useState("quotes");
   const [data, setData] = useState({ products: [], suppliers: [], clients: [], quotes: [], summary: {} });
@@ -52,29 +59,53 @@ function App() {
   };
 
   return (
-    React.createElement("div", { className: "app" },
-      React.createElement("header", { className: "topbar" },
+    React.createElement("div", { className: "app-shell" },
+      React.createElement("aside", { className: "sidebar" },
         React.createElement("div", { className: "brand" },
-          React.createElement("h1", null, "Gestor de Cotizaciones"),
-          React.createElement("p", null, "Productos, proveedores, clientes, PDF, estados e historial")
-        ),
-        React.createElement("nav", { className: "tabs" },
-          ["quotes", "products", "suppliers", "clients"].map(item =>
-            React.createElement("button", { key: item, className: `tab ${tab === item ? "active" : ""}`, onClick: () => setTab(item) }, label(item))
+          React.createElement("div", { className: "brand-mark", "aria-hidden": "true" }, "GC"),
+          React.createElement("div", null,
+            React.createElement("h1", null, "Gestor"),
+            React.createElement("p", null, "Cotizaciones")
           )
+        ),
+        React.createElement("nav", { className: "tabs", "aria-label": "Secciones" },
+          tabs.map(item =>
+            React.createElement("button", {
+              key: item.id,
+              className: `tab ${tab === item.id ? "active" : ""}`,
+              onClick: () => setTab(item.id)
+            },
+              React.createElement("span", { className: "tab-icon", "aria-hidden": "true" }, item.icon),
+              item.label
+            )
+          )
+        ),
+        React.createElement("div", { className: "sidebar-note" },
+          React.createElement("span", null, "Pipeline activo"),
+          React.createElement("strong", null, `${data.summary.pending ?? 0} pendientes`)
         )
       ),
-      React.createElement("main", { className: "layout" },
-        React.createElement("section", { className: "main" },
-          error && React.createElement("div", { className: "panel" }, error),
-          React.createElement(Metrics, { summary: data.summary }),
-          tab === "quotes" && React.createElement(Quotes, { quotes: data.quotes, setStatus }),
-          tab === "products" && React.createElement(ProductList, { products: data.products }),
-          tab === "suppliers" && React.createElement(PartyList, { title: "Proveedores", parties: data.suppliers }),
-          tab === "clients" && React.createElement(PartyList, { title: "Clientes", parties: data.clients })
+      React.createElement("main", { className: "workspace" },
+        React.createElement("header", { className: "page-header" },
+          React.createElement("div", null,
+            React.createElement("span", { className: "eyebrow" }, "Panel comercial"),
+            React.createElement("h2", null, titleFor(tab)),
+            React.createElement("p", null, "Administra clientes, productos, proveedores y cotizaciones desde una sola vista.")
+          ),
+          React.createElement("a", { className: "header-action", href: "https://github.com/MrJeff20/gestor-cotizaciones", target: "_blank", rel: "noreferrer" }, "Repositorio")
         ),
-        React.createElement("aside", { className: "side" },
-          React.createElement(NewQuoteForm, { clients: data.clients, products: data.products, onSubmit: createQuote })
+        error && React.createElement("div", { className: "alert" }, error),
+        React.createElement(Metrics, { summary: data.summary }),
+        React.createElement("div", { className: "content-grid" },
+          React.createElement("section", { className: "main-panel" },
+            tab === "quotes" && React.createElement(Quotes, { quotes: data.quotes, setStatus }),
+            tab === "products" && React.createElement(ProductList, { products: data.products }),
+            tab === "suppliers" && React.createElement(PartyList, { parties: data.suppliers }),
+            tab === "clients" && React.createElement(PartyList, { parties: data.clients })
+          ),
+          React.createElement("aside", { className: "side-panel" },
+            React.createElement(NewQuoteForm, { clients: data.clients, products: data.products, onSubmit: createQuote })
+          )
         )
       )
     )
@@ -82,9 +113,19 @@ function App() {
 }
 
 function Metrics({ summary }) {
-  return React.createElement("div", { className: "metrics" },
-    [["Cotizaciones", summary.quotes], ["Pendientes", summary.pending], ["Aprobadas", summary.approved], ["Productos", summary.products]].map(([name, value]) =>
-      React.createElement("div", { className: "metric", key: name }, React.createElement("span", null, name), React.createElement("strong", null, value ?? 0))
+  const items = [
+    ["Cotizaciones", summary.quotes, "Total emitidas"],
+    ["Pendientes", summary.pending, "Por gestionar"],
+    ["Aprobadas", summary.approved, "Cierre comercial"],
+    ["Productos", summary.products, "Catalogo activo"]
+  ];
+  return React.createElement("section", { className: "metrics", "aria-label": "Resumen" },
+    items.map(([name, value, caption]) =>
+      React.createElement("article", { className: "metric", key: name },
+        React.createElement("span", null, name),
+        React.createElement("strong", null, value ?? 0),
+        React.createElement("small", null, caption)
+      )
     )
   );
 }
@@ -94,26 +135,33 @@ function Quotes({ quotes, setStatus }) {
     quotes.map(quote => React.createElement("article", { className: "quote", key: quote.id },
       React.createElement("div", { className: "quote-head" },
         React.createElement("div", null,
-          React.createElement("h3", null, `${quote.number} · ${quote.clientName}`),
+          React.createElement("span", { className: "quote-number" }, quote.number),
+          React.createElement("h3", null, quote.clientName),
           React.createElement("div", { className: "muted" }, `Valida hasta ${new Date(quote.validUntil).toLocaleDateString("es-CL")}`)
         ),
-        React.createElement("span", { className: `status ${quote.status}` }, quote.status)
+        React.createElement("div", { className: "quote-total" },
+          React.createElement("span", { className: `status ${quote.status}` }, statusLabel(quote.status)),
+          React.createElement("strong", null, money.format(quote.total))
+        )
       ),
-      React.createElement("table", null,
-        React.createElement("thead", null, React.createElement("tr", null, ["SKU", "Producto", "Cant.", "Total"].map(h => React.createElement("th", { key: h }, h)))),
-        React.createElement("tbody", null, quote.items.map(item => React.createElement("tr", { key: `${quote.id}-${item.productId}` },
-          React.createElement("td", null, item.sku),
-          React.createElement("td", null, item.productName),
-          React.createElement("td", null, item.quantity),
-          React.createElement("td", null, money.format(item.total))
-        )))
+      React.createElement("div", { className: "table-wrap" },
+        React.createElement("table", null,
+          React.createElement("thead", null, React.createElement("tr", null, ["SKU", "Producto", "Cant.", "Total"].map(h => React.createElement("th", { key: h }, h)))),
+          React.createElement("tbody", null, quote.items.map(item => React.createElement("tr", { key: `${quote.id}-${item.productId}` },
+            React.createElement("td", null, item.sku),
+            React.createElement("td", null, item.productName),
+            React.createElement("td", null, item.quantity),
+            React.createElement("td", null, money.format(item.total))
+          )))
+        )
       ),
-      React.createElement("strong", null, `Total ${money.format(quote.total)}`),
-      React.createElement("div", { className: "actions" },
-        ["Sent", "Approved", "Rejected", "Expired"].map(status =>
-          React.createElement("button", { className: "ghost", key: status, onClick: () => setStatus(quote, status) }, status)
+      React.createElement("div", { className: "quote-footer" },
+        React.createElement("div", { className: "actions" },
+          ["Sent", "Approved", "Rejected", "Expired"].map(status =>
+            React.createElement("button", { className: "ghost", key: status, onClick: () => setStatus(quote, status) }, statusLabel(status))
+          )
         ),
-        React.createElement("a", { className: "primary", href: `/api/quotes/${quote.id}/pdf` }, "PDF")
+        React.createElement("a", { className: "primary", href: `/api/quotes/${quote.id}/pdf` }, "Descargar PDF")
       ),
       React.createElement("ol", { className: "history" }, quote.history.map((event, index) =>
         React.createElement("li", { key: index },
@@ -126,49 +174,71 @@ function Quotes({ quotes, setStatus }) {
 }
 
 function ProductList({ products }) {
-  return React.createElement("section", { className: "panel" },
-    React.createElement("h2", null, "Productos"),
-    products.map(product => React.createElement("div", { className: "row", key: product.id },
-      React.createElement("div", null, React.createElement("strong", null, product.name), React.createElement("div", { className: "muted" }, `${product.sku} · ${product.supplierName}`)),
-      React.createElement("strong", null, money.format(product.unitPrice))
+  return React.createElement("section", { className: "panel-list" },
+    products.map(product => React.createElement("article", { className: "data-row", key: product.id },
+      React.createElement("div", { className: "avatar", "aria-hidden": "true" }, product.sku.slice(0, 2)),
+      React.createElement("div", { className: "row-main" },
+        React.createElement("strong", null, product.name),
+        React.createElement("span", null, `${product.sku} - ${product.supplierName}`)
+      ),
+      React.createElement("strong", { className: "row-value" }, money.format(product.unitPrice))
     ))
   );
 }
 
-function PartyList({ title, parties }) {
-  return React.createElement("section", { className: "panel" },
-    React.createElement("h2", null, title),
-    parties.map(party => React.createElement("div", { className: "row", key: party.id },
-      React.createElement("div", null, React.createElement("strong", null, party.name), React.createElement("div", { className: "muted" }, party.email)),
-      React.createElement("span", { className: "muted" }, party.phone)
+function PartyList({ parties }) {
+  return React.createElement("section", { className: "panel-list" },
+    parties.map(party => React.createElement("article", { className: "data-row", key: party.id },
+      React.createElement("div", { className: "avatar", "aria-hidden": "true" }, initials(party.name)),
+      React.createElement("div", { className: "row-main" },
+        React.createElement("strong", null, party.name),
+        React.createElement("span", null, party.email)
+      ),
+      React.createElement("span", { className: "row-value muted" }, party.phone)
     ))
   );
 }
 
 function NewQuoteForm({ clients, products, onSubmit }) {
   const defaultDate = useMemo(() => new Date(Date.now() + 14 * 86400000).toISOString().slice(0, 10), []);
-  return React.createElement("section", { className: "panel" },
-    React.createElement("h2", null, "Nueva cotizacion"),
+  return React.createElement("section", { className: "composer" },
+    React.createElement("div", { className: "section-title" },
+      React.createElement("span", { className: "eyebrow" }, "Rapido"),
+      React.createElement("h3", null, "Nueva cotizacion")
+    ),
     React.createElement("form", { className: "form", onSubmit },
       React.createElement("div", { className: "field" },
-        React.createElement("label", null, "Cliente"),
-        React.createElement("select", { name: "clientId", required: true }, clients.map(client => React.createElement("option", { value: client.id, key: client.id }, client.name)))
+        React.createElement("label", { htmlFor: "clientId" }, "Cliente"),
+        React.createElement("select", { id: "clientId", name: "clientId", required: true }, clients.map(client => React.createElement("option", { value: client.id, key: client.id }, client.name)))
       ),
       React.createElement("div", { className: "field" },
-        React.createElement("label", null, "Valida hasta"),
-        React.createElement("input", { name: "validUntil", type: "date", defaultValue: defaultDate, required: true })
+        React.createElement("label", { htmlFor: "validUntil" }, "Valida hasta"),
+        React.createElement("input", { id: "validUntil", name: "validUntil", type: "date", defaultValue: defaultDate, required: true })
       ),
-      products.map(product => React.createElement("div", { className: "line", key: product.id },
-        React.createElement("div", null, React.createElement("strong", null, product.name), React.createElement("div", { className: "muted" }, money.format(product.unitPrice))),
-        React.createElement("input", { name: `qty-${product.id}`, type: "number", min: "0", placeholder: "0" })
-      )),
-      React.createElement("button", { className: "primary", type: "submit" }, "Crear cotizacion")
+      React.createElement("div", { className: "product-picker" },
+        products.map(product => React.createElement("label", { className: "line", key: product.id },
+          React.createElement("span", null,
+            React.createElement("strong", null, product.name),
+            React.createElement("small", null, money.format(product.unitPrice))
+          ),
+          React.createElement("input", { name: `qty-${product.id}`, type: "number", min: "0", placeholder: "0", "aria-label": `Cantidad de ${product.name}` })
+        ))
+      ),
+      React.createElement("button", { className: "primary wide", type: "submit" }, "Crear cotizacion")
     )
   );
 }
 
-function label(tab) {
-  return ({ quotes: "Cotizaciones", products: "Productos", suppliers: "Proveedores", clients: "Clientes" })[tab];
+function titleFor(tab) {
+  return ({ quotes: "Cotizaciones", products: "Catalogo de productos", suppliers: "Proveedores", clients: "Clientes" })[tab];
+}
+
+function statusLabel(status) {
+  return ({ Draft: "Borrador", Sent: "Enviada", Approved: "Aprobada", Rejected: "Rechazada", Expired: "Vencida" })[status] ?? status;
+}
+
+function initials(name) {
+  return name.split(" ").slice(0, 2).map(part => part[0]).join("").toUpperCase();
 }
 
 ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(App));
